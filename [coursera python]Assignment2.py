@@ -1,0 +1,253 @@
+
+# coding: utf-8
+
+# ---
+# 
+# _You are currently looking at **version 1.2** of this notebook. To download notebooks and datafiles, as well as get help on Jupyter notebooks in the Coursera platform, visit the [Jupyter Notebook FAQ](https://www.coursera.org/learn/python-data-analysis/resources/0dhYG) course resource._
+# 
+# ---
+
+# # Assignment 2 - Pandas Introduction
+# All questions are weighted the same in this assignment.
+# ## Part 1
+# The following code loads the olympics dataset (olympics.csv), which was derrived from the Wikipedia entry on [All Time Olympic Games Medals](https://en.wikipedia.org/wiki/All-time_Olympic_Games_medal_table), and does some basic data cleaning. 
+# 
+# The columns are organized as # of Summer games, Summer medals, # of Winter games, Winter medals, total # number of games, total # of medals. Use this dataset to answer the questions below.
+
+# In[1]:
+
+import pandas as pd
+
+df = pd.read_csv('olympics.csv', index_col=0, skiprows=1)
+
+for col in df.columns:
+    if col[:2]=='01':
+        df.rename(columns={col:'Gold'+col[4:]}, inplace=True)
+    if col[:2]=='02':
+        df.rename(columns={col:'Silver'+col[4:]}, inplace=True)
+    if col[:2]=='03':
+        df.rename(columns={col:'Bronze'+col[4:]}, inplace=True)
+    if col[:1]=='№':
+        df.rename(columns={col:'#'+col[1:]}, inplace=True)
+
+names_ids = df.index.str.split('\s\(') # split the index by '('
+
+df.index = names_ids.str[0] # the [0] element is the country name (new index) 
+df['ID'] = names_ids.str[1].str[:3] # the [1] element is the abbreviation or ID (take first 3 characters from that)
+
+df = df.drop('Totals')
+
+
+# ### Question 1
+# Which country has won the most gold medals in summer games?
+# 
+# *This function should return a single string value.*
+
+# In[2]:
+
+def answer_one():
+    df_copy=df.copy()
+    df_copy['country']=df_copy.index
+    df_copy=df_copy.set_index('Gold')
+    df_copy=df_copy.sort_index()
+    most_gold_country=df_copy.iloc[len(df_copy)-1]['country']
+    return most_gold_country
+
+
+# ### Question 2
+# Which country had the biggest difference between their summer and winter gold medal counts?
+# 
+# *This function should return a single string value.*
+
+# In[3]:
+
+def answer_two():
+    df_copy=df.copy()
+    df_copy['country']=df_copy.index
+    df_copy['difference']=df_copy['Gold']-df_copy['Gold.1']
+    for i in df_copy['difference']:
+        if i<0:
+            i=-i
+    df_copy=df_copy.set_index('difference')
+    df_copy=df_copy.sort_index()
+    country=df_copy.iloc[len(df_copy)-1]['country']
+    return country
+
+
+# ### Question 3
+# Which country has the biggest difference between their summer gold medal counts and winter gold medal counts relative to their total gold medal count? 
+# 
+# $$\frac{Summer~Gold - Winter~Gold}{Total~Gold}$$
+# 
+# Only include countries that have won at least 1 gold in both summer and winter.
+# 
+# *This function should return a single string value.*
+
+# In[4]:
+
+def answer_three():
+    df_copy=df.copy()
+    df_copy=df_copy.where(df_copy['Gold']>0)
+    df_copy=df_copy.where(df_copy['Gold.1']>0)
+    df_copy=df_copy.dropna()
+    df_copy['country']=df_copy.index
+    df_copy['difference_relative']=(df_copy['Gold']-df_copy['Gold.1'])/df_copy['Gold.2']
+    for i in df_copy['difference_relative']:
+        if i<0:
+            i=-i
+    df_copy=df_copy.set_index('difference_relative')
+    df_copy=df_copy.sort_index()
+    country=df_copy.iloc[len(df_copy)-1]['country']
+    return country
+
+
+# ### Question 4
+# Write a function that creates a Series called "Points" which is a weighted value where each gold medal (`Gold.2`) counts for 3 points, silver medals (`Silver.2`) for 2 points, and bronze medals (`Bronze.2`) for 1 point. The function should return only the column (a Series object) which you created, with the country names as indices.
+# 
+# *This function should return a Series named `Points` of length 146*
+
+# In[5]:
+
+def answer_four():
+    df_copy=df.copy()
+    df_copy['Points']=df_copy['Gold.2']*3+df_copy['Silver.2']*2+df_copy['Bronze.2']*1
+    
+    return df_copy['Points']
+
+
+# ## Part 2
+# For the next set of questions, we will be using census data from the [United States Census Bureau](http://www.census.gov). Counties are political and geographic subdivisions of states in the United States. This dataset contains population data for counties and states in the US from 2010 to 2015. [See this document](https://www2.census.gov/programs-surveys/popest/technical-documentation/file-layouts/2010-2015/co-est2015-alldata.pdf) for a description of the variable names.
+# 
+# The census dataset (census.csv) should be loaded as census_df. Answer questions using this as appropriate.
+# 
+# ### Question 5
+# Which state has the most counties in it? (hint: consider the sumlevel key carefully! You'll need this for future questions too...)
+# 
+# *This function should return a single string value.*
+
+# In[65]:
+
+census_df = pd.read_csv('census.csv')
+ww=census_df.copy()
+ww=ww.where(ww['STNAME']=='Colorado')
+ww=ww.dropna()
+len(ww)
+
+
+# In[7]:
+
+def answer_five():
+    df_copy=census_df.copy()
+    column_to_keep=['STNAME','CTYNAME','COUNTY','STATE','SUMLEV']
+    df_copy=df_copy[column_to_keep]
+    state=list(df_copy['STNAME'].unique())
+    state_county=[]
+    first_row=1
+    for i in df_copy['SUMLEV']:
+        if i==40:
+            if first_row:
+                county_number=0
+                first_row=0
+            else:
+                state_county.append(county_number)
+                county_number=0
+        else:
+            county_number+=1
+    state_index=state_county.index(max(state_county))
+    return state[state_index]
+
+
+# ### Question 6
+# **Only looking at the three most populous counties for each state**, what are the three most populous states (in order of highest population to lowest population)? Use `CENSUS2010POP`.
+# 
+# *This function should return a list of string values.*
+
+# In[74]:
+
+def answer_six():
+    df_copy=census_df.copy()
+    column_to_keep=['STNAME','CTYNAME','SUMLEV','CENSUS2010POP']
+    df_copy=df_copy[column_to_keep]
+    df_copy=df_copy.set_index('STNAME')
+    #把有关的列全部转化为list，顺序一一对应
+    #semlev作用在于每个新的state开始处将county_pop赋值给一个dic，然后自身清零
+    dic_state_pop={}
+    firstline=1
+    for i in range(len(df_copy)):
+        if df_copy.iloc[i]['SUMLEV']==40 and firstline==1:
+            firstline=0
+            county_pop=[]
+            continue
+        if df_copy.iloc[i]['SUMLEV']==40 and firstline==0:
+            county_pop=sorted(county_pop,reverse=1)
+            if len(county_pop)>=3:
+                pop_total=county_pop[0]+county_pop[1]+county_pop[2]
+                dic_state_pop[df_copy.iloc[i-1].name]=pop_total
+                #清零
+                county_pop=[]
+        if df_copy.iloc[i]['SUMLEV']==50:
+            county_pop.append(df_copy.iloc[i]['CENSUS2010POP'])
+    #处理dict
+    state=list(dic_state_pop.keys())
+    pop3=list(dic_state_pop.values())
+    pop3_copy=pop3.copy()
+    pop3_copy=sorted(pop3_copy,reverse=1)
+    one=pop3_copy[0]
+    two=pop3_copy[1]
+    three=pop3_copy[2]
+    top3_state=[state[pop3.index(one)],state[pop3.index(two)],state[pop3.index(three)]]
+    return top3_state
+answer_six()
+
+
+# ### Question 7
+# Which county has had the largest absolute change in population within the period 2010-2015? (Hint: population values are stored in columns POPESTIMATE2010 through POPESTIMATE2015, you need to consider all six columns.)
+# 
+# e.g. If County Population in the 5 year period is 100, 120, 80, 105, 100, 130, then its largest change in the period would be |130-80| = 50.
+# 
+# *This function should return a single string value.*
+
+# In[47]:
+
+def answer_seven():
+    df_copy=census_df.copy()
+    df_copy=df_copy.where(df_copy['SUMLEV']==50)
+    df_copy=df_copy.dropna()
+    column_to_keep=['CTYNAME','POPESTIMATE2010','POPESTIMATE2011','POPESTIMATE2012','POPESTIMATE2013','POPESTIMATE2014','POPESTIMATE2015']
+    df_copy=df_copy[column_to_keep]
+    df_copy=df_copy.set_index('CTYNAME')
+    dic_county_pop={}
+    for i in range(len(df_copy)):
+        list_pop=list(df_copy.iloc[i])
+        change_pop=max(list_pop)-min(list_pop)
+        dic_county_pop[df_copy.iloc[i].name]=change_pop
+    #处理dic
+    county_list=list(dic_county_pop.keys())
+    pop_list=list(dic_county_pop.values())
+    top_pop_change_county=county_list[pop_list.index(max(pop_list))]
+    return top_pop_change_county
+
+
+# ### Question 8
+# In this datafile, the United States is broken up into four regions using the "REGION" column. 
+# 
+# Create a query that finds the counties that belong to regions 1 or 2, whose name starts with 'Washington', and whose POPESTIMATE2015 was greater than their POPESTIMATE 2014.
+# 
+# *This function should return a 5x2 DataFrame with the columns = ['STNAME', 'CTYNAME'] and the same index ID as the census_df (sorted ascending by index).*
+
+# In[10]:
+
+def answer_eight():
+    df_copy=census_df.copy()
+    column_to_keep=['STNAME','CTYNAME','REGION','POPESTIMATE2014','POPESTIMATE2015']
+    df_copy=df_copy[column_to_keep]
+    df_copy=df_copy[(df_copy['REGION']==2) | (df_copy['REGION']==1)]
+    df_copy=df_copy.where(df_copy['POPESTIMATE2014']<df_copy['POPESTIMATE2015'])
+    df_copy=df_copy.dropna()
+    new=pd.DataFrame(columns=['STNAME','CTYNAME','REGION','POPESTIMATE2014','POPESTIMATE2015'])
+    for i in range(len(df_copy)):
+        if df_copy.iloc[i]['CTYNAME'].startswith('Washington'):
+            new=new.append(df_copy.iloc[i])
+    new=new[['STNAME','CTYNAME']]
+    return new
+
